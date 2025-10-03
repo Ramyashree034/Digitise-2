@@ -13,13 +13,13 @@ app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// MongoDB connection
+// ------------------- MongoDB -------------------
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("MongoDB error:", err));
 
-// Multer storage
+// ------------------- Multer -------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) =>
@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Registration Schema
+// ------------------- Registration Schema -------------------
 const registrationSchema = new mongoose.Schema({
   teamLeader: {
     name: String,
@@ -47,10 +47,10 @@ const registrationSchema = new mongoose.Schema({
 });
 const Registration = mongoose.model("Registration", registrationSchema);
 
-// SendGrid setup
+// ------------------- SendGrid -------------------
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// Registration API
+// ------------------- Registration API -------------------
 app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
   try {
     if (!req.file) {
@@ -83,38 +83,36 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
     await registration.save();
 
     // Email to participant
-    if (process.env.SENDGRID_API_KEY && process.env.NOTIFY_EMAIL) {
-      await sgMail.send({
-        to: email,
-        from: process.env.NOTIFY_EMAIL,
-        subject: `✅ Registration Confirmed - ${event}`,
-        html: `<h2>Thank you for registering, ${name}!</h2>
-               <p>Your registration for <strong>${event}</strong> is confirmed.</p>
-               <p><strong>Payment Status:</strong> ✔ Payment Received</p>`,
-      });
+    await sgMail.send({
+      to: email,
+      from: process.env.NOTIFY_EMAIL,
+      subject: `✅ Registration Confirmed - ${event}`,
+      html: `<h2>Thank you for registering, ${name}!</h2>
+             <p>Your registration for <strong>${event}</strong> is confirmed.</p>
+             <p><strong>Payment Status:</strong> ✔ Payment Received</p>`,
+    });
 
-      // Email to organizer
-      await sgMail.send({
-        to: process.env.NOTIFY_EMAIL,
-        from: process.env.NOTIFY_EMAIL,
-        subject: `📥 New Registration - ${event}`,
-        html: `<h2>New Registration Alert</h2>
-               <p><strong>Leader:</strong> ${name}</p>
-               <p><strong>Email:</strong> ${email}</p>
-               <p><strong>Phone:</strong> ${phone}</p>
-               <p><strong>Event:</strong> ${event}</p>
-               <p><strong>Payment Received:</strong> ✔ Yes</p>
-               <p><strong>Team Size:</strong> ${registration.teamSize}</p>`,
-        attachments: [
-          {
-            content: fs.readFileSync(req.file.path).toString("base64"),
-            filename: req.file.originalname,
-            type: "application/octet-stream",
-            disposition: "attachment",
-          },
-        ],
-      });
-    }
+    // Email to organizer
+    await sgMail.send({
+      to: process.env.NOTIFY_EMAIL,
+      from: process.env.NOTIFY_EMAIL,
+      subject: `📥 New Registration - ${event}`,
+      html: `<h2>New Registration Alert</h2>
+             <p><strong>Leader:</strong> ${name}</p>
+             <p><strong>Email:</strong> ${email}</p>
+             <p><strong>Phone:</strong> ${phone}</p>
+             <p><strong>Event:</strong> ${event}</p>
+             <p><strong>Payment Received:</strong> ✔ Yes</p>
+             <p><strong>Team Size:</strong> ${registration.teamSize}</p>`,
+      attachments: [
+        {
+          content: fs.readFileSync(req.file.path).toString("base64"),
+          filename: req.file.originalname,
+          type: "image/png",
+          disposition: "attachment",
+        },
+      ],
+    });
 
     res.status(200).json({ message: "Registration submitted successfully!" });
   } catch (err) {
@@ -123,13 +121,18 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
   }
 });
 
-// ✅ Serve frontend build from backend/dist
+// ------------------- Serve frontend -------------------
 app.use(express.static(path.join(__dirname, "dist")));
 
-// SPA fallback: serve index.html for any route not handled by API
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+// Express 5 SPA fallback for all GET requests that are not API or uploads
+app.use((req, res, next) => {
+  if (req.method === "GET" && !req.path.startsWith("/register") && !req.path.startsWith("/uploads")) {
+    res.sendFile(path.join(__dirname, "dist", "index.html"));
+  } else {
+    next();
+  }
 });
 
+// ------------------- Start server -------------------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
