@@ -128,7 +128,8 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
 // ✅ Serve frontend build
 app.use(express.static(path.join(__dirname, "dist"))); // Make sure 'dist' folder is here
 
-app.get("*", (req, res) => {
+// Send index.html for all unmatched routes (safe wildcard)
+app.get("/*", (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
