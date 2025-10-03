@@ -18,7 +18,7 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Serve uploads folder temporarily (optional)
+// Serve uploads folder
 app.use("/uploads", express.static(uploadDir));
 
 // MongoDB connection
@@ -35,7 +35,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Schema
+// Registration schema
 const registrationSchema = new mongoose.Schema({
   teamLeader: {
     name: String,
@@ -126,10 +126,10 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
 });
 
 // ✅ Serve frontend build
-app.use(express.static(path.join(__dirname, "dist"))); // Make sure 'dist' folder is here
+app.use(express.static(path.join(__dirname, "dist")));
 
-// Send index.html for all unmatched routes (safe wildcard)
-app.get("/*", (req, res) => {
+// ✅ Regex wildcard for frontend routing (prevents PathError)
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
