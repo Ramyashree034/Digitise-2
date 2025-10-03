@@ -11,23 +11,31 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ------------------- MongoDB -------------------
+// ✅ Ensure uploads folder exists
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Serve uploads folder temporarily (optional)
+app.use("/uploads", express.static(uploadDir));
+
+// MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("MongoDB error:", err));
 
-// ------------------- Multer -------------------
+// Multer storage
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
+  destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) =>
     cb(null, Date.now() + path.extname(file.originalname)),
 });
 const upload = multer({ storage });
 
-// ------------------- Registration Schema -------------------
+// Schema
 const registrationSchema = new mongoose.Schema({
   teamLeader: {
     name: String,
@@ -47,29 +55,17 @@ const registrationSchema = new mongoose.Schema({
 });
 const Registration = mongoose.model("Registration", registrationSchema);
 
-// ------------------- SendGrid -------------------
+// SendGrid setup
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// ------------------- Registration API -------------------
+// Registration API
 app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
   try {
     if (!req.file) {
-      return res
-        .status(400)
-        .json({ message: "Payment screenshot is required!" });
+      return res.status(400).json({ message: "Payment screenshot is required!" });
     }
 
-    const {
-      name,
-      email,
-      phone,
-      college,
-      year,
-      experience,
-      usn,
-      event,
-      participants,
-    } = req.body;
+    const { name, email, phone, college, year, experience, usn, event, participants } = req.body;
 
     const registration = new Registration({
       teamLeader: { name, email, phone, college, year, experience, usn },
@@ -90,6 +86,14 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
       html: `<h2>Thank you for registering, ${name}!</h2>
              <p>Your registration for <strong>${event}</strong> is confirmed.</p>
              <p><strong>Payment Status:</strong> ✔ Payment Received</p>`,
+      attachments: [
+        {
+          content: fs.readFileSync(req.file.path).toString("base64"),
+          filename: req.file.originalname,
+          type: "image/png",
+          disposition: "attachment",
+        },
+      ],
     });
 
     // Email to organizer
@@ -121,18 +125,12 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
   }
 });
 
-// ------------------- Serve frontend -------------------
-app.use(express.static(path.join(__dirname, "dist")));
+// ✅ Serve frontend build
+app.use(express.static(path.join(__dirname, "dist"))); // Make sure 'dist' folder is here
 
-// Express 5 SPA fallback for all GET requests that are not API or uploads
-app.use((req, res, next) => {
-  if (req.method === "GET" && !req.path.startsWith("/register") && !req.path.startsWith("/uploads")) {
-    res.sendFile(path.join(__dirname, "dist", "index.html"));
-  } else {
-    next();
-  }
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
-// ------------------- Start server -------------------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
