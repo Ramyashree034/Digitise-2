@@ -2,38 +2,18 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const multer = require("multer");
-const path = require("path");
 const sgMail = require("@sendgrid/mail");
-const fs = require("fs");
 
 dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Ensure uploads folder exists
-const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Serve uploads folder
-app.use("/uploads", express.static(uploadDir));
-
 // MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("MongoDB error:", err));
-
-// Multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname)),
-});
-const upload = multer({ storage });
 
 // Registration schema
 const registrationSchema = new mongoose.Schema({
@@ -49,8 +29,7 @@ const registrationSchema = new mongoose.Schema({
   event: String,
   teamSize: Number,
   participants: [{ name: String, email: String, usn: String }],
-  paymentDone: Boolean,
-  paymentFile: String,
+  paymentConfirmed: Boolean,
   createdAt: { type: Date, default: Date.now },
 });
 const Registration = mongoose.model("Registration", registrationSchema);
@@ -59,21 +38,33 @@ const Registration = mongoose.model("Registration", registrationSchema);
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Registration API
-app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
+app.post("/register", async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: "Payment screenshot is required!" });
-    }
+    const {
+      name,
+      email,
+      phone,
+      college,
+      year,
+      experience,
+      usn,
+      event,
+      participants,
+      paymentConfirmed,
+    } = req.body;
 
-    const { name, email, phone, college, year, experience, usn, event, participants } = req.body;
+    if (!paymentConfirmed) {
+      return res
+        .status(400)
+        .json({ message: "Please confirm that you have sent payment via WhatsApp!" });
+    }
 
     const registration = new Registration({
       teamLeader: { name, email, phone, college, year, experience, usn },
       event,
-      teamSize: JSON.parse(participants || "[]").length + 1,
-      participants: JSON.parse(participants || "[]"),
-      paymentDone: true,
-      paymentFile: req.file.filename,
+      teamSize: (participants?.length || 0) + 1,
+      participants,
+      paymentConfirmed,
     });
 
     await registration.save();
@@ -85,15 +76,7 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
       subject: `✅ Registration Confirmed - ${event}`,
       html: `<h2>Thank you for registering, ${name}!</h2>
              <p>Your registration for <strong>${event}</strong> is confirmed.</p>
-             <p><strong>Payment Status:</strong> ✔ Payment Received</p>`,
-      attachments: [
-        {
-          content: fs.readFileSync(req.file.path).toString("base64"),
-          filename: req.file.originalname,
-          type: "image/png",
-          disposition: "attachment",
-        },
-      ],
+             <p><strong>Payment Status:</strong> ✔ Confirmed via WhatsApp</p>`,
     });
 
     // Email to organizer
@@ -106,16 +89,8 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
              <p><strong>Email:</strong> ${email}</p>
              <p><strong>Phone:</strong> ${phone}</p>
              <p><strong>Event:</strong> ${event}</p>
-             <p><strong>Payment Received:</strong> ✔ Yes</p>
+             <p><strong>Payment Confirmed:</strong> ✔ Yes</p>
              <p><strong>Team Size:</strong> ${registration.teamSize}</p>`,
-      attachments: [
-        {
-          content: fs.readFileSync(req.file.path).toString("base64"),
-          filename: req.file.originalname,
-          type: "image/png",
-          disposition: "attachment",
-        },
-      ],
     });
 
     res.status(200).json({ message: "Registration submitted successfully!" });
@@ -125,12 +100,10 @@ app.post("/register", upload.single("paymentScreenshot"), async (req, res) => {
   }
 });
 
-// ✅ Serve frontend build
-app.use(express.static(path.join(__dirname, "dist")));
-
-// ✅ Regex wildcard for frontend routing (prevents PathError)
+// Serve frontend build
+app.use(express.static("dist"));
 app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+  res.sendFile("index.html", { root: "dist" });
 });
 
 const PORT = process.env.PORT || 5000;
