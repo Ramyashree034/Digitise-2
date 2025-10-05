@@ -82,7 +82,7 @@ app.post("/register", async (req, res) => {
 
     // Email to organizer
     await sgMail.send({
-      to: process.env.NOTIFY_EMAIL.split(","),
+      to: process.env.NOTIFY_EMAIL,
       from: process.env.NOTIFY_EMAIL,
       subject: `📥 New Registration - ${event}`,
       html: `<h2>New Registration Alert</h2>
@@ -109,4 +109,5 @@ app.get(/.*/, (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
