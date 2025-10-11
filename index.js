@@ -53,14 +53,7 @@ app.post("/register", async (req, res) => {
       paymentConfirmed,
     } = req.body;
 
-    // ✅ Stop Hackathon registrations
-    if (event && event.toLowerCase().includes("hackathon")) {
-      return res.status(400).json({
-        message: "🚫 Registrations for Hackathon are now closed.",
-      });
-    }
-
-    // ✅ Checkbox validation
+    // ✅ Only checkbox validation (no screenshot check)
     if (!paymentConfirmed) {
       return res
         .status(400)
@@ -87,7 +80,7 @@ app.post("/register", async (req, res) => {
              <p><strong>Payment Status:</strong> ✔ Confirmed via WhatsApp</p>`,
     });
 
-    // Email to organizer(s)
+    // Email to organizer
     await sgMail.send({
       to: process.env.NOTIFY_EMAIL.split(","),
       from: process.env.NOTIFY_EMAIL,
@@ -101,7 +94,7 @@ app.post("/register", async (req, res) => {
              <p><strong>Team Size:</strong> ${registration.teamSize}</p>`,
     });
 
-    res.status(200).json({ message: "Registration submitted successfully! and mails sent" });
+    res.status(200).json({ message: "Registration submitted successfully!  and mails sent" });
   } catch (err) {
     console.error("❌ Error submitting registration:", err);
     res.status(500).json({ message: "Error submitting registration" });
@@ -115,4 +108,4 @@ app.get(/.*/, (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));  
