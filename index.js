@@ -53,18 +53,22 @@ app.post("/register", async (req, res) => {
       paymentConfirmed,
     } = req.body;
 
-    // ✅ Stop Hackathon registrations
-    if (event && event.toLowerCase().includes("hackathon")) {
+    // 🚫 Stop specific event registrations
+    if (
+      event &&
+      (event.toLowerCase().includes("hackathon") ||
+        event.toLowerCase().includes("byte battle tech"))
+    ) {
       return res.status(400).json({
-        message: "🚫 Registrations for Hackathon are now closed.",
+        message: `🚫 Registrations for ${event} are now closed.`,
       });
     }
 
     // ✅ Checkbox validation
     if (!paymentConfirmed) {
-      return res
-        .status(400)
-        .json({ message: "Please confirm that you have sent payment via WhatsApp!" });
+      return res.status(400).json({
+        message: "Please confirm that you have sent payment via WhatsApp!",
+      });
     }
 
     const registration = new Registration({
@@ -101,7 +105,9 @@ app.post("/register", async (req, res) => {
              <p><strong>Team Size:</strong> ${registration.teamSize}</p>`,
     });
 
-    res.status(200).json({ message: "Registration submitted successfully! and mails sent" });
+    res.status(200).json({
+      message: "Registration submitted successfully! and mails sent",
+    });
   } catch (err) {
     console.error("❌ Error submitting registration:", err);
     res.status(500).json({ message: "Error submitting registration" });
