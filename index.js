@@ -58,7 +58,8 @@ app.post("/register", async (req, res) => {
       event &&
       (event.toLowerCase().includes("hackathon") ||
         event.toLowerCase().includes("byte battle tech") ||
-        event.toLowerCase().includes("debugging tech"))
+        event.toLowerCase().includes("debugging tech") ||
+        event.toLowerCase().includes("freefire non tech"))
     ) {
       return res.status(400).json({
         message: `🚫 Registrations for ${event} are now closed.`,
